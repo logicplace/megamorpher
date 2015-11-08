@@ -1,0 +1,4 @@
+training*.txt
+testing*.txt
+g2p*.train
+*/
