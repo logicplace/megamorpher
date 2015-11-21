@@ -2,3 +2,6 @@ training*.txt
 testing*.txt
 g2p*.train
 */
+weights.txt
+*.out
+test.*.txt
