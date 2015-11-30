@@ -35,8 +35,8 @@ if args.morph:
 	# i, limit = 0, 100
 	trainOn = []
 	doWeights = False
-	classifier = timbl.TimblClassifier("morpher", "-a 1 +D")
-	with open(args.morphs, "r") as f:
+	classifier = timbl.TimblClassifier("morpher", "-a 1 +D" + (" +v+s" if args.simple else ""))
+	with open(args.morph, "r") as f:
 		for l in f:
 			l = l.rstrip()
 			if l:
@@ -150,6 +150,8 @@ for t, rt in iteritems(test):
 				lv = i
 				if fv is None: fv = i
 
+		if fv is None: fv = lv = 0
+
 		for i, o in enumerate(opts):
 			# Take top for these.
 			if i <= fv or o[0][0] not in vowels or i >= lv: res.append(o[0])
@@ -159,81 +161,6 @@ for t, rt in iteritems(test):
 		#endfor
 
 		return [x for x, y in res], fitness(res)
-
-		# # Permutate options
-		# sureness = [(None, 0)] * 2
-		# cnt = 0
-		# dopts = dict(enumerate(opts))
-		# mp = []
-		# for i, v in enumerate(opts):
-		# 	# Find most probable given neighbor's options
-		# 	lside = [x for x, _ in dopts.get(i - 1, [("-", 1)])]
-		# 	rside = [x for x, _ in dopts.get(i + 1, [("-", 1)])]
-
-		# 	winners = {}
-		# 	for l, r in itertools.product(lside, rside):
-		# 		ttl = ptotal(i, l, r)
-		# 		mph, mpr = None, 0
-		# 		if ttl:
-		# 			for ph, _ in v:
-		# 				pr = pprob(l, ph, r, ttl)
-		# 				if pr > mpr: mph, mpr = ph, pr
-		# 			#endfor
-
-		# 		if mph is not None: winners[mph] = winners.get(mph, 0) + 1
-		# 	#endfor
-
-		# 	if len(winners) == 0: print(v)
-
-		# 	print(winners)
-		# 	winner = max(winners.items(), key=lambda x: x[1])[0]
-		# 	for ph, pr in v:
-		# 		if ph == winner:
-		# 			mp.append((ph, pr, winners[ph] / sum(winners.values())))
-		# 			break
-		# #endfor
-		# mf = phitness(mp)
-
-		# while True:
-		# 	unbroken = True
-		# 	#print("Idxs(%i)[%i]" % (cnt, len(idxs)), end=": ")
-		# 	for i, x in enumerate(idxs):
-		# 		idxs[i] = (x + 1) % len(opts[i])
-		# 		#print("%i +[%i] 1 = %i" % (x, len(opts[i]), idxs[i]), end=", ")
-		# 		if idxs[i] != 0:
-		# 			unbroken = False
-		# 			break
-		# 		#endif
-		# 	#endfor
-		# 	if unbroken: break
-
-		# 	#print("")
-
-		# 	cnt += 1
-
-		# 	probs = [v[idxs[i]] for i, v in enumerate(opts)]
-		# 	dprobs = dict(enumerate(probs))
-
-		# 	phpr = []
-		# 	for i, (ph, pr) in enumerate(probs):
-		# 		(l, lp), (r, rp) = dprobs.get(i - 1, ("-", 1)), dprobs.get(i + 1, ("-", 1))
-
-		# 		phpr.append(pprob(l, ph, r, ptotal(i, l, r)))
-		# 	#endfor
-
-		# 	probs = [(a, b, phpr[i]) for i, (a, b) in enumerate(probs)]
-		# 	probfit = phitness(probs)
-
-		# 	if probfit > sureness[-1][1]:
-		# 		sureness.pop(0)
-		# 		sureness.append((probs, probfit))
-		# 		print("\nNew best: ", probs, probfit)
-		# 	#endif
-		# #endwhile
-
-		# # Returns (most probable, surity, [other options])
-		# mp, mf = sureness.pop()
-		# return mp, mf, list(reversed(sureness))
 	#enddef
 
 	def fitness(clusters):
@@ -305,28 +232,31 @@ for t, rt in iteritems(test):
 
 			# Keep going til we stop.
 			try:
+				ms = 0
 				while True:
-					cmd = classifier.classify((["-", "-"] + phones)[-3:])
+					cmd, opts, surity = classifier.classify((["-", "-"] + phones)[-3:])
+					ms += 1
 					if cmd == "<":
 						# Remove
-						if not args.simple: print("Popping", graphs[-1], phones[-1])
+						if not args.simple: print("Morph step", ms, ": Popping", graphs[-1], phones[-1])
+						graphs.pop()
 						phones.pop()
 					elif cmd == ".":
 						# Stop
-						if not args.simple: print("Stopping, morphing")
+						if not args.simple: print("Morph step", ms, ": Stopping, morphing")
 						rmSilentE(graphs)
 						break
 					else:
 						# Append
 						g, p = cmd.split("/")
-						if not args.simple: print("Appending", g, p)
+						if not args.simple: print("Morph step", ms, ": Appending", g, p)
 						rmSilentE(graphs)
 						graphs.append(g)
 						phones.append(p)
 					#endif
 				#endwhile
 			except timbl.ClassifyException as err:
-				print("WARNING: Failled classification at a point, assuming end.")
+				print("WARNING: Failled classification at step %i, assuming end." % ms)
 			#endtry
 			graphs += ["i", "te"]
 			phones += ["AY", "T"]
@@ -335,30 +265,7 @@ for t, rt in iteritems(test):
 		untested += 1
 	#endif
 #endfor
-if not args.simple:
+if not args.simple and not args.word:
 	print("Entries: %i problematic; %i untested" % (problematic, untested))
 	print("Chunks: %i success; %i fail" % (gsuccess, gfail))
 	print("Phones: %i success; %i fail (+%i bad chunking)" % (psuccess, pfail, pbadg))
-
-
-if not args.morph: sys.exit(0)
-
-
-# # Test
-# with open(args.testing, "r") as f:
-# 	for l in f:
-# 		l = l.rstrip()
-# 		if l and l[0] != "#":
-# 			features, goals = l.split(" "), []
-# 			for x in trainOn: goals.append(features.pop(x))
-# 			for i, c in enumerate(classifiers):
-# 				try: tmp = c.classify(features)
-# 				except timbl.ClassifyException as err:
-# 					tmp = err
-# 					print(err)
-# 					sys.exit(1)
-# 				print("Classifying '%s', should be %s:" % (" ".join(features), goals[i]), tmp)
-# 			#endfor
-# 		#endif
-# 	#endfor
-# #endwith
