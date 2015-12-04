@@ -18,8 +18,8 @@ p2g = {
 	# Affricates
 	"CH": ["tch", "tsch", "tsh", "ch", "che", "cz", "ti", "t", "cc", "ci", "c"],
 	"JH": ["dge", "dg", "dj", "j", "ge", "gi", "g", "d"],
-	"SH": ["sh", "ti", "ci", "ssi", "si", "sch", "c", "ch", "she", "ss", "zs"],
 	# Fricatives (+ Aspirates)
+	"SH": ["sh", "ti", "ci", "ssi", "si", "sch", "c", "ch", "she", "ss", "zs"],
 	"DH": ["th"],
 	"F": ["ff", "f", "gh", "ph", "fh", "fe", "w"],
 	"HH": ["ch", "h"],
