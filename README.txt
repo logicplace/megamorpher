@@ -2,7 +2,8 @@ Implementation Model
 ====================
 Stages:
  * Grapheme - Phoneme Association
- * G2P Feature Analysis
+ * Grapheme & Phoneme Corpus Analysis
+ * Spelling to Phonemes
  * Phoneme-based Morpho-Derivational Steps Analysis
 
 Grapheme - Phoneme Association
@@ -41,11 +42,33 @@ sudo python3 setup3.py build_ext --timbl-include-dir=/usr/local/include/timbl --
 
 svn checkout http://svn.code.sf.net/p/cmusphinx/code/trunk/cmudict/
 
-# Run G2P Association
-TODO
+# A fullset.json is already included, so you can skip the g2p_assoc.py and generalization.
 
-# Run G2P Feature Analysis
-TODO
+# Run G2P Association:
+# This will automatically overwrite training.txt if you have one already.
+./g2p_assoc.py
 
-# Run Morphological Analysis
-TODO
+# You can continue (aka start) from a word with:
+# This will append to the existing training.txt
+./g2p_assoc.py -c WORD
+
+# You need to generalize it now because this was written for an old dumb idea and I didn't want to retrofit it:
+./datamgr.py -G training.txt fullset.json
+
+# Create a training set and a testing set:
+# Note that there is already a testingset.json provided with some pokemon names
+# this will be overwritten by using this command!
+./datamgr.py -S 2000 -C trainingset.json fullset.json testingset.json
+
+# Run G/P Corpus Analysis:
+./datamgr.py -c trainingset.json traingraphs.json
+./datamgr.py -t trainingset.json trainphones.json
+
+# Apply suffix to a word with full output:
+./trainer.py -c traingraphs.json -t trainphones.json -m stones.txt -w WORD
+
+# Just output derivation:
+./trainer.py -c traingraphs.json -t trainphones.json -m stones.txt -sw WORD
+
+# Run over testset for testing chunking and phonemization:
+./trainer.py -c traingraphs.json -t trainphones.json testingset.json > results.txt

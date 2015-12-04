@@ -17,6 +17,12 @@ options.add_argument("--chunker", "-c", action="store_true",
 options.add_argument("--phonotactics", "-t", action="store_true",
 	help="Read all the phonemes and create a phonotactics file.")
 
+subset = options.add_argument_group()
+subset.add_argument("--subset", "-S",
+	help="Create a subset of X random entries from the input file.")
+subset.add_argument("--save-complement", "-C",
+	help="Save the complement to the subset into the given file.")
+
 makeset = options.add_argument_group()
 makeset.add_argument("--graphemic-context", "-g", default=0,
 	help="Use a graphemic context of the given number on each side. 1 = one grapheme on each side.")
@@ -197,184 +203,30 @@ elif args.phonotactics:
 
 	# Write out data
 	with open(args.output, "w") as f: json.dump([g2p, pnn], f)
+elif args.subset:
+	# Grab "args.subset" random, non-problematic entries.
+	from random import randrange
+	remaining = int(args.subset)
 
-	# stops = ["P", "B", "T", "D", "K", "G"]
-	# affricates = ["CH", "JH"]
-	# fricatives = ["F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH"]
-	# nasals = ["M", "N", "NG"]
-	# liquids = ["L", "R"]
-	# glides = ["Y", "W"] # also: semivowels
-	# vowels = ["AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW", "Y", "W"]
+	ldata = len(data)
+	outdata = []
+	while remaining:
+		r = randrange(0, ldata)
 
-	# obstruents = stops + affricates + fricatives
-	# approximates = liquids + glides
-	# sonorants = nasals + approximates + vowels
+		k, v = data.popitem(r)
+		ldata -= 1
 
-	# voiced = ["B", "D", "G", "JH", "V", "DH", "Z", "ZH"] + sonorants
+		if "_" not in list(zip(*v))[0]:
+			outdata.append((k,v))
+			remaining -= 1
+		#endif
+	#endwhile
 
-	# def l2r(l): return "(?:" + "|".join(l) + ")"
+	with open(args.output, "w") as f: json.dump(odict(outdata), f)
 
-	# # Valid onset forms:
-	# #  3C: S ([M T P K] Y | [T P K] R | [P K] L | K W | F R)
-	# #  2C: obstruent approximate | S [P T K M N F TH]
-	# #  1C: !NG
-	# onset = re.compile(
-	# 	"(?:S/(?:[MTPK]/Y|[TPK]/R|[PK]/L|K/W|F/R|[PTKMNF]|TH)"
-	# 	"|" + l2r(obstruents) + "/" + l2r(approximates) +
-	# 	"|(?!NG)[^/]+)$"
-	# )
-
-	# def findOnset(v, i):
-	# 	st = max(0, i - 3)
-	# 	vt = v[st : i]
-	# 	pj = "/".join([ph for sp, ph in vt])
-	# 	mo = onset.search(pj)
-	# 	if mo:
-	# 		idx = len(filter(lambda x: x, pj[0 : max(0, mo.start() - 1)].split("/")))
-	# 		# Also return if this is a shakey syllabification
-	# 		st += idx - 1
-	# 		return vt[idx:], st >= 0 and v[st][1] in vowels
-	# 	else:
-	# 		return [], False
-	# 	#endif
-	# #enddef
-
-	# # Maybe: Valid coda forms?
-
-	# g2p, phonemes = {}, {}
-
-	# for v in itervalues(data):
-	# 	lenv = len(v)
-
-	# 	nextOnset, nextHalf = None, None
-	# 	gp, stress = [], []
-	# 	for g, p in v:
-	# 		if p[-1] in "012": p, s = p[:-1], p[-1]
-	# 		else: s = None
-	# 		gp.append((g, p))
-	# 		stress.append(s)
-	# 	#endfor
-
-	# 	for i, (g, p) in enumerate(gp):
-	# 		# We want a sort of syllable identity. This is: [onset] nucleus [coda] or C*VC*
-	# 		# If only one is dropped from a syllable, it's more likely to be the coda that is.
-	# 		left, right, silentE = [], [], None
-	# 		if p in vowels:
-	# 			# Find consonants to the left (onset)
-	# 			if nextOnset:
-	# 				left, half = nextOnset, nextHalf
-	# 				nextOnset = None
-	# 			else: left, half = findOnset(v, i)
-
-	# 			# Find all consonants to the right (coda)
-	# 			foundVowel = False
-	# 			for j in range(i + 1, lenv):
-	# 				# Find the next vowel
-	# 				if v[j][:-1] in vowels:
-	# 					# and its onset
-	# 					nextOnset, nextHalf = findOnset(v, j)
-	# 					# then between i and this is the coda
-	# 					right = v[i+1:j-len(nextOnset)]
-	# 					foundVowel = True
-	# 					break
-	# 				#endif
-	# 			#endfor
-	# 			if not foundVowel:
-	# 				# Grab everything to the end, then
-	# 				right = v[i+1:]
-	# 			#endif
-
-	# 			value1 = 0.5 if half else 1
-	# 			value0 = 0.5 if half else 0
-
-	# 			# Store information about each part of the syllable
-	# 			for lg, lp in left:
-	# 				if lp not in phonemes:
-	# 					phonemes[lp] = {
-	# 						"onsetInit": 0, "onsetMedial": 0, "onsetFinal": 0, "onsetSimple": 0,
-	# 						"codaInit": 0, "codaMedial": 0, "codaFinal": 0, "codaSimple": 0,
-	# 						"onsets": {}, "codas": {}, "envs": {},
-	# 					}
-	# 				#endif
-
-	# 				# Add possible phonemes per grapheme
-	# 				if lg not in g2p: g2p[lg] = {}
-	# 				if lp in g2p[lg]:
-	# 					g2p[lg][lp][0] += value1
-	# 					g2p[lg][lp][2] += value0
-	# 				else: g2p[lg][lp] = [value1, 0, value0]
-	# 			#endfor
-
-	# 			# Nucleus
-	# 			cpj = "/".join([rp for rg, rp in right])
-	# 			if p not in phonemes: phonemes[p] = { "onsets": {}, "codas": {}, "envs": {} }
-	# 			phonemes[p]["codas"][cpj] = phonemes[p]["codas"].get(cpj, 0) + 1
-
-	# 			value2 = 1. / (len(left) + 1)
-
-	# 			def onen(ph):
-	# 				opj = "/".join([lp for lg, lp in ph])
-	# 				phonemes[p]["onsets"][opj] = phonemes[p]["onsets"].get(opj, 0) + value2
-	# 				env = opj + "|" + cpj
-	# 				phonemes[p]["envs"][env] = phonemes[p]["envs"].get(env, 0) + value2
-	# 			#enddef
-
-	# 			if half:
-	# 				for i in range(len(left)): onen(left[i:])
-	# 			else: onen(left)
-
-	# 			if g not in g2p: g2p[g] = {}
-	# 			if p in g2p[g]: g2p[g][p][1] += 1
-	# 			else: g2p[g][p] = [0, 1, 0]
-
-	# 			for rg, rp in right:
-	# 				if rp not in phonemes:
-	# 					phonemes[rp] = {
-	# 						"onsetInit": 0, "onsetMedial": 0, "onsetFinal": 0, "onsetSimple": 0,
-	# 						"codaInit": 0, "codaMedial": 0, "codaFinal": 0, "codaSimple": 0,
-	# 						"onsets": {}, "codas": {}, "envs": {},
-	# 					}
-	# 				#endif
-
-	# 				# Add possible phonemes per grapheme
-	# 				if rg not in g2p: g2p[rg] = {}
-	# 				if rp in g2p[rg]:
-	# 					g2p[rg][rp][0] += value0
-	# 					g2p[rg][rp][2] += value1
-	# 				else: g2p[rg][rp] = [value0, 0, value1]
-	# 			#endfor
-
-	# 			def onco(side, ph, value):
-	# 				lenl = len(ph)
-	# 				if lenl == 1:
-	# 					phonemes[ph[0][1]][side + "Simple"] += value
-	# 				elif lenl > 1:
-	# 					opj = "/".join([lp for lg, lp in ph])
-	# 					phonemes[ph[0][1]][side + "Init"] += value
-	# 					phonemes[ph[-1][1]][side + "Final"] += value
-	# 					for i, (lg, lp) in enumerate(ph):
-	# 						if i and i < lenl: phonemes[lp][side + "Medial"] += value
-	# 						if opj not in phonemes[lp][side + "s"]:
-	# 							phonemes[lp][side + "s"][opj] = value
-	# 						else: phonemes[lp][side + "s"][opj] += value
-	# 					#endfor
-	# 				#endif
-	# 			#enddef
-
-	# 			if half:
-	# 				for i in range(len(left) + 1):
-	# 					onco("coda", left[:i], value2)
-	# 					onco("onset", left[i:], value2)
-	# 				#endfor
-	# 			else: onco("onset", left, 1)
-
-	# 			onco("coda", right, 1)
-	# 		#endif
-	# 	#endfor
-	# #endfor
-	
-	# Write out data
-	#with open(args.output, "w") as f: json.dump([g2p, phonemes], f)
+	if args.save_complement:
+		with open(args.save_complement, "w") as f: json.dump(data, f)
+	#endif
 else:
 	with open(args.output, "w") as f:
 		gc, pc = int(args.graphemic_context), int(args.phonetic_context)

@@ -1,7 +1,10 @@
 training*.txt
 testing*.txt
-g2p*.train
+*.train
 */
 weights.txt
 *.out
 test.*.txt
+results.txt
+traingraphs.json
+trainphones.json

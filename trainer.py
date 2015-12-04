@@ -23,7 +23,7 @@ args = parser.parse_args(sys.argv[1:])
 if args.word: test = { args.word: [] }
 else:
 	with open(args.testing, "r") as f:
-		if args.testing[-5:] == ".json": test = json.load(f)
+		if args.testing[-5:] == ".json": test = json.load(f, object_pairs_hook=odict)
 		else: test = f.read().splitlines()
 	#endwith
 #endif
@@ -57,8 +57,9 @@ if args.morph:
 
 with open(args.chunking, "r") as f: gc, data, envs, ons = json.load(f)
 with open(args.phonotactics, "r") as f2: g2p, pnn = json.load(f2)
-gsuccess, gfail, problematic, untested = 0, 0, 0, 0
-psuccess, pfail, pbadg = 0, 0, 0
+problematic, untested = 0, 0
+gsuccess, gfail, gosuccess, gofail = 0, 0, 0, 0
+psuccess, pfail, posuccess, pofail = 0, 0, 0, 0
 for t, rt in iteritems(test):
 	stest = "-" + t + "-"
 	dtest = dict(enumerate(stest))
@@ -196,29 +197,52 @@ for t, rt in iteritems(test):
 	# Test or just print if there's no verification
 	if rt:
 		fit, (ggoal, pgoal) = fitness(bestClusters), list(zip(*rt))
-		if "_" in goal:
+		if "_" in ggoal:
 			print("Problematic:")
 			problematic += 1
-			goal = [x  for x in goal if x != "_"]
+			ggoal = [x for x in ggoal if x != "_"]
 		#endif
 
-		if [g for g, prb in bestClusters] == ggoal:
-			gsuccess += 1
+		# Remove stress
+		pgoal = [x[:-1] if x[-1] in "012" else x for x in pgoal]
 
-			pmp, pmf, opts = phitest(bestClusters)
-			if [p for p, pg, pp in pmp] == pgoal:
-				print("OK:", t, fit)
-				psuccess += 1
-			else:
-				print("Phones NG:", t, pmf)
-				pfail += 1
-			#endif
+		bcb = [g for g, prb in bestClusters]
+		if bcb == list(ggoal):
+			print("Chunks OK:", t, fit)
+			gosuccess += 1
+			gsuccess += len(bcb)
+
+			pmp, pmf = phitest(bestClusters)
 		else:
 			print("Chunks NG:", t, fit)
-			print("Found:", bestClusters)
-			print("Wanted:", goal)
-			gfail += 1
-			pbadg += 1
+			print(" Found:", bestClusters)
+			print(" Wanted:", ggoal)
+			gofail += 1
+
+			for x, y in zip(bcb, ggoal):
+				if x == y: gsuccess += 1
+				else: gfail += 1
+			#endfor
+
+			pmp, pmf = phitest(list(zip(ggoal, [1] * len(ggoal))))
+		#endif
+		
+		if pmp == pgoal:
+		#if [p for p, pg, pp in pmp] == pgoal:
+			print("Phones OK:", t, fit)
+			posuccess += 1
+			psuccess += len(pmp)
+		else:
+			print("Phones NG:", t, pmf)
+			print(" Found:", pmp)
+			print(" Wanted:", pgoal)
+			pofail += 1
+
+			for x, y in zip(pmp, pgoal):
+				if x == y: psuccess += 1
+				else: pfail += 1
+			#endfor
+		#endif
 	else:
 		graphs, phones = [x for x,y in bestClusters], phitest(bestClusters)[0]
 
@@ -236,20 +260,21 @@ for t, rt in iteritems(test):
 				while True:
 					cmd, opts, surity = classifier.classify((["-", "-"] + phones)[-3:])
 					ms += 1
+					pfx = "Morph step %i (%s, %.2f%%):" % (ms, opts, surity * 100)
 					if cmd == "<":
 						# Remove
-						if not args.simple: print("Morph step", ms, ": Popping", graphs[-1], phones[-1])
+						if not args.simple: print(pfx, "Popping", graphs[-1], phones[-1])
 						graphs.pop()
 						phones.pop()
 					elif cmd == ".":
 						# Stop
-						if not args.simple: print("Morph step", ms, ": Stopping, morphing")
+						if not args.simple: print(pfx, "Stopping, morphing")
 						rmSilentE(graphs)
 						break
 					else:
 						# Append
 						g, p = cmd.split("/")
-						if not args.simple: print("Morph step", ms, ": Appending", g, p)
+						if not args.simple: print(pfx, "Appending", g, p)
 						rmSilentE(graphs)
 						graphs.append(g)
 						phones.append(p)
@@ -267,5 +292,7 @@ for t, rt in iteritems(test):
 #endfor
 if not args.simple and not args.word:
 	print("Entries: %i problematic; %i untested" % (problematic, untested))
-	print("Chunks: %i success; %i fail" % (gsuccess, gfail))
-	print("Phones: %i success; %i fail (+%i bad chunking)" % (psuccess, pfail, pbadg))
+	print("Chunks: %i chunk success; %i chunk fail; %i word success; %i word fail" % (
+		gsuccess, gfail, gosuccess, gofail))
+	print("Phones: %i phone success; %i phone fail; %i word success; %i word fail" % (
+		psuccess, pfail, posuccess, pofail))
